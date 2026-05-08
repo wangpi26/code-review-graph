@@ -861,7 +861,7 @@ var gRoot = svg.append("g");
 var currentTransform = d3.zoomIdentity;
 var zoomBehavior = d3.zoom()
   .scaleExtent([0.05, 8])
-  .on("zoom", function(ev) { currentTransform = ev.transform; gRoot.attr("transform", ev.transform); updateLabelVisibility(); });
+  .on("zoom", function(ev) { currentTransform = ev.transform; gRoot.attr("transform", ev.transform); counterScale(); updateLabelVisibility(); });
 svg.call(zoomBehavior);
 var defs = svg.append("defs");
 var glow = defs.append("filter").attr("id","glow").attr("x","-50%").attr("y","-50%").attr("width","200%").attr("height","200%");
@@ -1010,9 +1010,25 @@ function updateLabelVisibility() {
     if (d.kind === "File") return null;
     if (d.kind === "Class") return s > 0.5 ? null : "none";
     return s > 1.0 ? null : "none";
+  }).attr("font-size", function(d) {
+    var base = d.kind === "File" ? 12 : d.kind === "Class" ? 11 : 10;
+    return (base / s) + "px";
   });
 }
+function counterScale() {
+  var k = currentTransform.k;
+  nodeGroup.selectAll("g.node-g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ") scale(" + (1/k) + ")"; });
+  if (linkSel) linkSel.attr("stroke-width", function(d) { return eStyle(d).width / k; });
+  if (labelSel) labelSel
+    .attr("x", function(d) { return d.x + (degreeRadius(d) + 5) / k; })
+    .attr("y", function(d) { return d.y; })
+    .attr("font-size", function(d) {
+      var base = d.kind === "File" ? 12 : d.kind === "Class" ? 11 : 10;
+      return (base / k) + "px";
+    });
+}
 function highlightConnected(d, on) {
+  var k = currentTransform.k;
   if (on) {
     var connected = new Set([d.qualified_name]);
     edges.forEach(function(e) {
@@ -1032,14 +1048,14 @@ function highlightConnected(d, on) {
       .attr("stroke-width", function(e) {
         var s = typeof e.source === "object" ? e.source.qualified_name : e._source;
         var t = typeof e.target === "object" ? e.target.qualified_name : e._target;
-        return (s === d.qualified_name || t === d.qualified_name) ? 2.5 : eStyle(e).width;
+        return (s === d.qualified_name || t === d.qualified_name) ? 2.5 / k : eStyle(e).width / k;
       });
     labelSel.transition().duration(150).attr("opacity", function(n) { return connected.has(n.qualified_name) ? 1 : 0.1; });
   } else {
     nodeGroup.selectAll("g.node-g").select(".node-shape").transition().duration(300).attr("opacity", 1);
     linkSel.transition().duration(300)
       .attr("opacity", function(e) { return eStyle(e).opacity; })
-      .attr("stroke-width", function(e) { return eStyle(e).width; });
+      .attr("stroke-width", function(e) { return eStyle(e).width / k; });
     labelSel.transition().duration(300).attr("opacity", 1);
     updateLabelVisibility();
   }
@@ -1059,9 +1075,9 @@ simulation.on("tick", function() {
   if (linkSel) linkSel
     .attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; })
     .attr("x2", function(d) { return d.target.x; }).attr("y2", function(d) { return d.target.y; });
-  nodeGroup.selectAll("g.node-g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+  nodeGroup.selectAll("g.node-g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ") scale(" + (1/currentTransform.k) + ")"; });
   if (labelSel) labelSel
-    .attr("x", function(d) { return d.x + degreeRadius(d) + 5; })
+    .attr("x", function(d) { return d.x + (degreeRadius(d) + 5) / currentTransform.k; })
     .attr("y", function(d) { return d.y; });
 });
 // Only auto-collapse File nodes on very large graphs, otherwise all edges
@@ -1761,7 +1777,7 @@ var gRoot = svg.append("g");
 var currentTransform = d3.zoomIdentity;
 var zoomBehavior = d3.zoom()
   .scaleExtent([0.05, 8])
-  .on("zoom", function(ev) { currentTransform = ev.transform; gRoot.attr("transform", ev.transform); updateLabelVisibility(); });
+  .on("zoom", function(ev) { currentTransform = ev.transform; gRoot.attr("transform", ev.transform); counterScale(); updateLabelVisibility(); });
 svg.call(zoomBehavior);
 var defs = svg.append("defs");
 var glow = defs.append("filter").attr("id","glow").attr("x","-50%").attr("y","-50%").attr("width","200%").attr("height","200%");
@@ -1916,9 +1932,9 @@ function renderGraph(nodesData, edgesData, drillDown) {
     linkSel
       .attr("x1", function(d) { return d.source.x; }).attr("y1", function(d) { return d.source.y; })
       .attr("x2", function(d) { return d.target.x; }).attr("y2", function(d) { return d.target.y; });
-    nodeGroup.selectAll("g.node-g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+    nodeGroup.selectAll("g.node-g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ") scale(" + (1/currentTransform.k) + ")"; });
     labelSel
-      .attr("x", function(d) { return d.x + nodeRadius(d) + 5; })
+      .attr("x", function(d) { return d.x + (nodeRadius(d) + 5) / currentTransform.k; })
       .attr("y", function(d) { return d.y; });
   });
 
@@ -1934,10 +1950,30 @@ function updateLabelVisibility() {
     if (d.kind === "Community" || d.kind === "File") return null;
     if (d.kind === "Class") return s > 0.5 ? null : "none";
     return s > 1.0 ? null : "none";
+  }).attr("font-size", function(d) {
+    var base = d.kind === "Community" ? 13 : d.kind === "File" ? 12 : 10;
+    return (base / s) + "px";
   });
 }
 
+function counterScale() {
+  var k = currentTransform.k;
+  nodeGroup.selectAll("g.node-g").attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ") scale(" + (1/k) + ")"; });
+  if (linkSel) linkSel.attr("stroke-width", function(d) {
+    if (d.weight && (d.kind === "CROSS_COMMUNITY" || d.kind === "DEPENDS_ON")) return Math.max(1, Math.min(6, Math.sqrt(d.weight))) / k;
+    return eStyle(d).width / k;
+  });
+  if (labelSel) labelSel
+    .attr("x", function(d) { return d.x + (nodeRadius(d) + 5) / k; })
+    .attr("y", function(d) { return d.y; })
+    .attr("font-size", function(d) {
+      var base = d.kind === "Community" ? 13 : d.kind === "File" ? 12 : 10;
+      return (base / k) + "px";
+    });
+}
+
 function highlightConnected(d, on) {
+  var k = currentTransform.k;
   if (on) {
     var connected = new Set([d.qualified_name]);
     currentEdges.forEach(function(e) {
@@ -1958,7 +1994,7 @@ function highlightConnected(d, on) {
         var s = typeof e.source === "object" ? e.source.qualified_name : e._source;
         var t = typeof e.target === "object" ? e.target.qualified_name : e._target;
         var base = e.weight ? Math.max(1, Math.min(6, Math.sqrt(e.weight))) : eStyle(e).width;
-        return (s === d.qualified_name || t === d.qualified_name) ? base + 1.5 : base;
+        return ((s === d.qualified_name || t === d.qualified_name) ? base + 1.5 : base) / k;
       });
     if (labelSel) labelSel.transition().duration(150).attr("opacity", function(n) { return connected.has(n.qualified_name) ? 1 : 0.1; });
   } else {
@@ -1966,8 +2002,8 @@ function highlightConnected(d, on) {
     if (linkSel) linkSel.transition().duration(300)
       .attr("opacity", function(e) { return eStyle(e).opacity; })
       .attr("stroke-width", function(e) {
-        if (e.weight && (e.kind === "CROSS_COMMUNITY" || e.kind === "DEPENDS_ON")) return Math.max(1, Math.min(6, Math.sqrt(e.weight)));
-        return eStyle(e).width;
+        if (e.weight && (e.kind === "CROSS_COMMUNITY" || e.kind === "DEPENDS_ON")) return Math.max(1, Math.min(6, Math.sqrt(e.weight))) / k;
+        return eStyle(e).width / k;
       });
     if (labelSel) labelSel.transition().duration(300).attr("opacity", 1);
     updateLabelVisibility();
